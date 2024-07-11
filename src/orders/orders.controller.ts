@@ -6,12 +6,14 @@ import {
   Param,
   Inject,
   Query,
+  ParseUUIDPipe,
+  Patch,
 } from '@nestjs/common';
-import { CreateOrderDto } from './dto/create-order.dto';
 import { ORDERS_SERVICE } from '../config/services';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
-import { PaginationDto } from '../common';
 import { catchError } from 'rxjs';
+import { CreateOrderDto, OrderPaginationDto, StatusDto } from './dto';
+import { PaginationDto } from '../common';
 
 @Controller('orders')
 export class OrdersController {
@@ -25,16 +27,47 @@ export class OrdersController {
   }
 
   @Get()
-  findAll(@Query() paginationDto: PaginationDto) {
-    return this.ordersClient.send('findAllOrders', paginationDto);
+  findAll(@Query() orderPaginationDto: OrderPaginationDto) {
+    return this.ordersClient.send('findAllOrders', orderPaginationDto);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.ordersClient.send('findOneOrder', { id }).pipe(
       catchError((err) => {
         throw new RpcException(err);
       }),
     );
+  }
+
+  @Get('status/:status')
+  findAllByStatus(
+    @Param() statusDto: StatusDto,
+    @Query() paginationDto: PaginationDto,
+  ) {
+    return this.ordersClient
+      .send('findAllOrdersByStatus', {
+        status: statusDto.status,
+        ...paginationDto,
+      })
+      .pipe(
+        catchError((err) => {
+          throw new RpcException(err);
+        }),
+      );
+  }
+
+  @Patch(':id')
+  changeOrderStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() statusDto: StatusDto,
+  ) {
+    return this.ordersClient
+      .send('changeOrderStatus', { id, status: statusDto.status })
+      .pipe(
+        catchError((err) => {
+          throw new RpcException(err);
+        }),
+      );
   }
 }
